@@ -43,82 +43,144 @@ export default function Chat() {
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim()) return
+  e.preventDefault();
+  if (!input.trim()) return;
 
-    setLoading(true)
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content: input,
-      role: 'user',
-      created_at: new Date().toISOString()
-    }
+  setLoading(true);
+  const newMessage: Message = {
+    id: Date.now().toString(),
+    content: input,
+    role: "user",
+    created_at: new Date().toISOString(),
+  };
 
-    // Actualizar UI optimista
-    setMessages(prev => [...prev, newMessage])
-    setInput('')
+  // Actualizar UI optimista
+  setMessages((prev) => [...prev, newMessage]);
+  setInput("");
 
-    try {
-      // Llamar a la API de Next.js
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input })
-      })
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: input }),
+    });
 
-      if (!response.ok) throw new Error('Error en la respuesta')
+    if (!response.body) throw new Error("No response body from server");
 
-      const { content } = await response.json()
-      
-      const assistantMessage: Message = {
-        id: Date.now().toString(),
-        content,
-        role: 'assistant',
-        created_at: new Date().toISOString()
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let assistantContent = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true }).trim();
+
+      // 🔹 Manejo de JSON en streaming
+      if (chunk.startsWith("data:")) {
+        try {
+          const parsedChunk = JSON.parse(chunk.replace(/^data:\s*/, ""));
+          if (parsedChunk.choices && parsedChunk.choices[0].delta.content) {
+            assistantContent += parsedChunk.choices[0].delta.content;
+          }
+        } catch (error) {
+          console.error("Error al parsear JSON streaming:", error);
+        }
       }
-
-      setMessages(prev => [...prev, assistantMessage])
-    } catch (error) {
-      console.error('Error:', error)
-      // Manejar error
-    } finally {
-      setLoading(false)
     }
+
+    // Agregar respuesta del asistente al chat
+    const assistantMessage: Message = {
+      id: Date.now().toString(),
+      content: assistantContent,
+      role: "assistant",
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, assistantMessage]);
+  } catch (error) {
+    console.error("Error:", error);
+  } finally {
+    setLoading(false);
   }
+};
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <div className="border rounded-lg p-4 mb-4 h-96 overflow-y-auto">
+    <div className="max-w-3xl mx-auto p-4 h-screen flex flex-col">
+  <div className="flex-1 mb-4 overflow-hidden flex flex-col">
+    <div className="border dark:border-gray-700 rounded-lg p-4 h-[500px] overflow-y-auto bg-white dark:bg-gray-900 shadow-lg">
+      <div className="space-y-4">
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`mb-4 p-2 rounded-lg ${
-              message.role === 'user'
-                ? 'bg-blue-100 ml-auto max-w-[80%]'
-                : 'bg-gray-100 mr-auto max-w-[80%]'
+            className={`group flex ${
+              message.role === 'user' ? 'justify-end' : 'justify-start'
             }`}
           >
-            <p>{message.content}</p>
+            <div
+              className={`max-w-[85%] rounded-xl p-4 transition-all duration-200 ${
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white ml-4 hover:bg-blue-700 dark:bg-blue-800 dark:hover:bg-blue-900'
+                  : 'bg-gray-100 dark:bg-gray-800 mr-4 hover:bg-gray-50 dark:hover:bg-gray-700/80 dark:text-gray-100'
+              }`}
+            >
+              <div className="prose dark:prose-invert prose-sm">
+                {message.content.split('\n').map((line, index) => (
+                  <p key={index} className="break-words">
+                    {line}
+                  </p>
+                ))}
+              </div>
+              <div className="mt-1 text-xs opacity-70">
+                {new Date(message.created_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </div>
+            </div>
           </div>
         ))}
       </div>
-      
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          className="flex-1 p-2 border rounded"
-          disabled={loading}
-        />
-        <button
-          type="submit"
-          className="bg-blue-500 text-white px-4 py-2 rounded disabled:opacity-50"
-          disabled={loading}
-        >
-          {loading ? 'Enviando...' : 'Enviar'}
-        </button>
-      </form>
     </div>
+  </div>
+
+  <form
+    onSubmit={handleSubmit}
+    className="sticky bottom-0 bg-white dark:bg-gray-900 pt-4"
+  >
+    <div className="flex gap-2 relative">
+      <input
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="Escribe tu mensaje..."
+        className="flex-1 p-4 rounded-xl border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-all pr-14"
+        disabled={loading}
+      />
+      <button
+        type="submit"
+        disabled={loading}
+        className="absolute right-2 top-2 h-10 w-10 flex items-center justify-center rounded-lg bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        {loading ? (
+          <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M3 13.5h2v-3H3v3zm16 0h2v-3h-2v3zm-8.03-2.809l.474-.423 6.086 6.728-.474.423-6.086-6.728zm-.945-1.035l.85-.523 3.627 5.896-.85.523-3.627-5.896zM12 4.5c-3.26 0-6.327.77-9 2.12v12.74c2.673-1.35 5.74-2.12 9-2.12s6.327.77 9 2.12V6.62c-2.673-1.35-5.74-2.12-9-2.12z" />
+          </svg>
+        )}
+      </button>
+    </div>
+    <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-2">
+      Puedes pedir ayuda sobre cualquier tema - Presiona Enter para enviar
+    </p>
+  </form>
+</div>
   )
 }
