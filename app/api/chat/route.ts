@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
-  const supabase = await createClient(); // ✅ Use await here
+  const supabase = await createClient(); // ✅ Crear cliente de Supabase
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -31,12 +31,21 @@ export async function POST(request: Request) {
       .order('created_at', { ascending: true })
       .limit(10);
 
-    // 3. Llamar a LM Studio
+    // 3. Llamar a LM Studio con instrucciones adicionales.
     const lmResponse = await fetch('http://192.168.0.13:1234/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: [
+          {
+            role: 'system',
+            content: `Responde ÚNICAMENTE con el comentario final, en el idioma original del mensaje.
+            Formato requerido:
+            - Sin marcas de pensamiento (nada de <think> o similares)
+            - Sin prefijos como "Respuesta:" o "Final Answer:"
+            - Texto directo y conciso
+            - Máxima claridad eliminando metatexto`
+          },
           ...(history?.map((msg: { role: string; content: string }) => ({
             role: msg.role,
             content: msg.content
@@ -44,7 +53,7 @@ export async function POST(request: Request) {
           { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_tokens: -1,
+        max_tokens: 2000,
         stream: false
       })
     });
