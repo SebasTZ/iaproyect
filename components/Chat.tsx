@@ -41,6 +41,14 @@ export default function Chat() {
     loadHistory()
   }, [])
 
+  // Función para limpiar respuesta en el cliente: elimina bloques <think> y prefijos innecesarios
+  const sanitizeResponse = (text: string) => {
+    return text
+      .replace(/<think>.*?<\/think>/gs, '')
+      .replace(/^\s*Final Answer:\s*/i, '')
+      .trim()
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim()) return
@@ -69,7 +77,7 @@ export default function Chat() {
 
       const assistantMessage: Message = {
         id: Date.now().toString(),
-        content: data.content,
+        content: sanitizeResponse(data.content),
         role: 'assistant',
         created_at: new Date().toISOString(),
       }

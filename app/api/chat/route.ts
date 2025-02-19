@@ -1,11 +1,16 @@
-import { createClient } from '@/utils/supabase/server' 
+import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 
+// Función para limpiar la respuesta: elimina bloques <think> y espacios innecesarios
+const cleanAssistantResponse = (text: string): string => {
+  text = text.replace(/<think>[\s\S]*?<\/think>/g, '');
+  return text.trim().replace(/\n\s*\n/g, '\n');
+};
+
 export async function POST(request: Request) {
-  const supabase = await createClient(); // ✅ Crear cliente de Supabase
+  const supabase = await createClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-
   if (authError || !user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
   }
@@ -13,7 +18,7 @@ export async function POST(request: Request) {
   const { message } = await request.json();
 
   try {
-    // 1. Guardar mensaje del usuario
+    // Guardar mensaje del usuario
     const { error: userMessageError } = await supabase
       .from('chats')
       .insert([{
@@ -21,17 +26,16 @@ export async function POST(request: Request) {
         content: message,
         role: 'user'
       }]);
-
     if (userMessageError) throw userMessageError;
 
-    // 2. Obtener historial de chat
+    // Obtener historial de chat
     const { data: history } = await supabase
       .from('chats')
       .select('content, role')
       .order('created_at', { ascending: true })
       .limit(10);
 
-    // 3. Llamar a LM Studio con instrucciones adicionales.
+    // Llamar a LM Studio con instrucciones adicionales
     const lmResponse = await fetch('http://192.168.0.13:1234/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -39,12 +43,7 @@ export async function POST(request: Request) {
         messages: [
           {
             role: 'system',
-            content: `Responde ÚNICAMENTE con el comentario final, en el idioma original del mensaje.
-            Formato requerido:
-            - Sin marcas de pensamiento (nada de <think> o similares)
-            - Sin prefijos como "Respuesta:" o "Final Answer:"
-            - Texto directo y conciso
-            - Máxima claridad eliminando metatexto`
+            content: `Eres un asistente muy competente. Razonas internamente, pero solo muestra el comentario final (no incluyas tu proceso mental). Además, responde en el idioma de la pregunta o interacción.`
           },
           ...(history?.map((msg: { role: string; content: string }) => ({
             role: msg.role,
@@ -59,9 +58,10 @@ export async function POST(request: Request) {
     });
 
     const responseData = await lmResponse.json();
-    const assistantContent = responseData.choices[0].message.content;
+    let assistantContent = responseData.choices[0].message.content;
+    assistantContent = cleanAssistantResponse(assistantContent);
 
-    // 4. Guardar respuesta del asistente
+    // Guardar respuesta del asistente
     const { error: assistantMessageError } = await supabase
       .from('chats')
       .insert([{
@@ -69,7 +69,6 @@ export async function POST(request: Request) {
         content: assistantContent,
         role: 'assistant'
       }]);
-
     if (assistantMessageError) throw assistantMessageError;
 
     return NextResponse.json({ content: assistantContent });
