@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       .order('created_at', { ascending: true })
       .limit(10);
 
-    // 3. Llamar a LM Studio (corregido el formato del array)
+    // 3. Llamar a LM Studio
     const lmResponse = await fetch('http://192.168.0.13:1234/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
