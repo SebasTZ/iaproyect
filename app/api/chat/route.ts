@@ -7,6 +7,23 @@ const cleanAssistantResponse = (text: string): string => {
   return text.trim().replace(/\n\s*\n/g, '\n');
 };
 
+// Agentes de IA
+const agents = {
+  legislacion: "Eres un experto en legislación peruana. Responde con artículos de códigos y normas oficiales.",
+  contrato: "Eres un experto en derecho contractual en Perú. Explica conceptos y casos de contratos con precisión.",
+  jurisprudencia: "Eres un especialista en jurisprudencia peruana. Responde con fallos de la Corte Suprema y casos relevantes.",
+  doctrina: "Eres un experto en doctrina jurídica. Explica principios legales y teorías del derecho con claridad."
+};
+
+// Detecta el agente según la pregunta si no se especifica
+const detectAgent = (message: string): string => {
+  if (/ley|norma|artículo|código/i.test(message)) return "legislacion";
+  if (/contrato|obligación|acuerdo/i.test(message)) return "contrato";
+  if (/jurisprudencia|fallo|sentencia/i.test(message)) return "jurisprudencia";
+  if (/doctrina|principio|teoría/i.test(message)) return "doctrina";
+  return "legislacion"; // Default
+};
+
 export async function POST(request: Request) {
   const supabase = await createClient();
 
@@ -28,6 +45,10 @@ export async function POST(request: Request) {
       }]);
     if (userMessageError) throw userMessageError;
 
+    // Detecta el agente de IA según el contenido del mensaje
+    const agentKey = detectAgent(message);
+    const agentInstruction = agents[agentKey as keyof typeof agents];
+
     // Obtener historial de chat
     const { data: history } = await supabase
       .from('chats')
@@ -45,14 +66,18 @@ export async function POST(request: Request) {
             role: 'system',
             content: `Eres un asistente muy competente. Razonas internamente, pero solo muestra el comentario final (no incluyas tu proceso mental). Además, responde en el idioma de la pregunta o interacción.`
           },
+          {
+            role: 'system',
+            content: agentInstruction
+          },
           ...(history?.map((msg: { role: string; content: string }) => ({
             role: msg.role,
             content: msg.content
           })) || []),
           { role: 'user', content: message }
         ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: 0.5,
+        max_tokens: 3000,
         stream: false
       })
     });
@@ -72,7 +97,7 @@ export async function POST(request: Request) {
     if (assistantMessageError) throw assistantMessageError;
 
     return NextResponse.json({ content: assistantContent });
-    
+
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json(
