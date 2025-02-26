@@ -36,56 +36,28 @@ export async function POST(request: Request) {
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    console.error("Error de autenticación:", authError);
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  let requestData;
-  try {
-    requestData = await request.json();
-  } catch (e) {
-    console.error("Error al parsear JSON de la solicitud:", e);
-    return NextResponse.json(
-      { error: "JSON inválido en la solicitud" },
-      { status: 400 }
-    );
-  }
-
-  const { message } = requestData;
-  if (!message || typeof message !== "string") {
-    return NextResponse.json(
-      {
-        error:
-          "El campo 'message' es requerido y debe ser una cadena de texto.",
-      },
-      { status: 400 }
-    );
-  }
+  const { message } = await request.json();
 
   try {
     // Guardar mensaje del usuario en Supabase
     const { error: userMessageError } = await supabase
       .from("chats")
       .insert([{ user_id: user.id, content: message, role: "user" }]);
-    if (userMessageError) {
-      console.error("Error al guardar mensaje de usuario:", userMessageError);
-      throw userMessageError;
-    }
+    if (userMessageError) throw userMessageError;
 
     // Detectar el agente y su instrucción
     const agentKey = detectAgent(message);
     const agentInstruction = agents[agentKey as keyof typeof agents];
 
     // Obtener historial del chat y fusionar mensajes consecutivos del mismo rol
-    const { data: history, error: historyError } = await supabase
+    const { data: history } = await supabase
       .from("chats")
       .select("content, role")
       .order("created_at", { ascending: true })
       .limit(10);
-    if (historyError) {
-      console.error("Error al obtener historial:", historyError);
-      throw historyError;
-    }
 
     const interleavedHistory: {
       role: "user" | "system" | "assistant";
@@ -107,7 +79,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Agregar el nuevo mensaje del usuario, fusionándolo si corresponde
+    // Agregar el nuevo mensaje solo si el último no es de rol 'user'; de lo contrario, fusionarlo
     if (
       interleavedHistory.length > 0 &&
       interleavedHistory[interleavedHistory.length - 1].role === "user"
@@ -132,9 +104,6 @@ export async function POST(request: Request) {
       ...interleavedHistory,
     ];
 
-    // Registrar para depuración
-    console.log("Mensaje enviados a DeepSeek:", messagesArray);
-
     // Inicializar cliente OpenAI con configuración DeepSeek
     const openai = new OpenAI({
       baseURL: process.env.Base_url, // ejemplo: "https://api.deepseek.com/v1"
@@ -154,11 +123,6 @@ export async function POST(request: Request) {
       frequency_penalty: 0.6,
     });
 
-    if (!completion) {
-      console.error("La respuesta de DeepSeek es nula o indefinida.");
-      throw new Error("No se obtuvo respuesta de la API de DeepSeek.");
-    }
-
     let assistantContent =
       completion.choices?.[0]?.message?.content ||
       "Error en la respuesta de IA.";
@@ -170,19 +134,13 @@ export async function POST(request: Request) {
       .insert([
         { user_id: user.id, content: assistantContent, role: "assistant" },
       ]);
-    if (assistantMessageError) {
-      console.error(
-        "Error al guardar mensaje del asistente:",
-        assistantMessageError
-      );
-      throw assistantMessageError;
-    }
+    if (assistantMessageError) throw assistantMessageError;
 
     return NextResponse.json({ content: assistantContent });
   } catch (error: any) {
-    console.error("DeepSeek API error:", error);
+    console.error("DeepSeek API error:", error.message || error);
     return NextResponse.json(
-      { error: error?.message || "Error procesando el mensaje" },
+      { error: error.message || "Error procesando el mensaje" },
       { status: 500 }
     );
   }
