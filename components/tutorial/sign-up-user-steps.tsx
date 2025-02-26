@@ -3,60 +3,71 @@ import { TutorialStep } from "./tutorial-step";
 import { ArrowUpRight } from "lucide-react";
 
 export default function SignUpUserSteps() {
+  const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const vercelEnv = process.env.VERCEL_ENV;
+
   return (
     <ol className="flex flex-col gap-6">
-      {process.env.VERCEL_ENV === "preview" ||
-      process.env.VERCEL_ENV === "production" ? (
-        <TutorialStep title="Set up redirect urls">
-          <p>It looks like this App is hosted on Vercel.</p>
-          <p className="mt-4">
-            This particular deployment is
-            <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
-              "{process.env.VERCEL_ENV}"
-            </span>{" "}
-            on
-            <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
-              https://{process.env.VERCEL_URL}
+      {(vercelEnv === "preview" || vercelEnv === "production") && (
+        <TutorialStep title="Configurar URLs de redirección">
+          <p>
+            La aplicación se está ejecutando en el entorno{" "}
+            <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-medium text-secondary-foreground border">
+              {vercelEnv}
             </span>
             .
           </p>
           <p className="mt-4">
-            You will need to{" "}
-            <Link
-              className="text-primary hover:text-foreground"
-              href={
-                "https://supabase.com/dashboard/project/_/auth/url-configuration"
-              }
-            >
-              update your Supabase project
-            </Link>{" "}
-            with redirect URLs based on your Vercel deployment URLs.
+            {vercelEnv === "production" ? (
+              <>
+                La URL de producción es{" "}
+                <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-medium text-secondary-foreground border">
+                  https://{productionUrl}
+                </span>
+                .<br />
+                ¡La cuenta de producción se ha creado correctamente!
+              </>
+            ) : (
+              <>
+                Estás trabajando en un entorno de desarrollo. Asegúrate de
+                actualizar la configuración de redirección en Supabase para
+                incluir:
+                <br />
+                <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-medium text-secondary-foreground border">
+                  http://localhost:3000/**
+                </span>
+              </>
+            )}
+          </p>
+          <p className="mt-4">
+            Actualiza la configuración de redirección en tu proyecto de Supabase
+            usando los URLs correspondientes.
           </p>
           <ul className="mt-4">
             <li>
               -{" "}
-              <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+              <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-medium text-secondary-foreground border">
                 http://localhost:3000/**
               </span>
             </li>
             <li>
               -{" "}
-              <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
-                {`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}/**`}
+              <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-medium text-secondary-foreground border">
+                {`https://${productionUrl}/**`}
               </span>
             </li>
             <li>
               -{" "}
-              <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
-                {`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL?.replace(".vercel.app", "")}-*-[vercel-team-url].vercel.app/**`}
+              <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-medium text-secondary-foreground border">
+                {`https://${productionUrl?.replace(".vercel.app", "")}-*-[vercel-team-url].vercel.app/**`}
               </span>{" "}
-              (Vercel Team URL can be found in{" "}
+              (El Team URL se configura en{" "}
               <Link
                 className="text-primary hover:text-foreground"
                 href="https://vercel.com/docs/accounts/create-a-team#find-your-team-id"
                 target="_blank"
               >
-                Vercel Team settings
+                Configuración del equipo en Vercel
               </Link>
               )
             </li>
@@ -66,21 +77,21 @@ export default function SignUpUserSteps() {
             target="_blank"
             className="text-primary/50 hover:text-primary flex items-center text-sm gap-1 mt-4"
           >
-            Redirect URLs Docs <ArrowUpRight size={14} />
+            Documentación de Redirect URLs <ArrowUpRight size={14} />
           </Link>
         </TutorialStep>
-      ) : null}
-      <TutorialStep title="Sign up your first user">
+      )}
+      <TutorialStep title="Registra tu primer usuario">
         <p>
-          Head over to the{" "}
+          Ingresa a la página de{" "}
           <Link
             href="/sign-up"
             className="font-bold hover:underline text-foreground/80"
           >
-            Sign up
+            Registro
           </Link>{" "}
-          page and sign up your first user. It's okay if this is just you for
-          now. Your awesome idea will have plenty of users later!
+          y regístrate. No te preocupes si ahora solo eres tú; ¡más adelante
+          tendrás muchos usuarios!
         </p>
       </TutorialStep>
     </ol>
