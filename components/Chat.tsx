@@ -95,7 +95,7 @@ export default function Chat() {
               }}
             >
               <div className="prose dark:prose-invert prose-sm sm:prose-base max-w-none">
-                {/* Usamos ReactMarkdown para renderizar el contenido con formato */}
+                {/* Renderizamos el contenido con ReactMarkdown */}
                 <ReactMarkdown>{message.content}</ReactMarkdown>
               </div>
               <div className="mt-2 text-xs opacity-60 dark:opacity-50 font-mono">
