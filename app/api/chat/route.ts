@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       .from("chats")
       .select("content, role")
       .order("created_at", { ascending: true })
-      .limit(2);
+      .limit(100);
 
     const interleavedHistory: {
       role: "user" | "system" | "assistant";
