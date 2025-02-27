@@ -9,7 +9,7 @@ export default async function Home() {
       <Hero />
       <main className="flex-1 flex flex-col gap-6 px-4">
         <h1 className="font-medium text-xl mb-4 text-center">
-          Entranado para responder a preguntas legales
+          Entrenado para responder a preguntas legales
         </h1>
       </main>
     </>
