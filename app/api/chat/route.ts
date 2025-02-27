@@ -119,7 +119,7 @@ export async function POST(request: Request) {
       messages: messagesArray,
       model: chosenModel,
       temperature: 0.5,
-      max_tokens: 3000,
+      max_tokens: 6000,
       presence_penalty: 0.6,
       frequency_penalty: 0.6,
       stream: true,
