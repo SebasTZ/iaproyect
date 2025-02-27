@@ -108,6 +108,7 @@ export async function POST(request: Request) {
     const openai = new OpenAI({
       baseURL: process.env.Base_url, // ejemplo: "https://api.deepseek.com/v1"
       apiKey: process.env.API_KEY, // clave para DeepSeek
+      timeout: 60000, // Aumentar el tiempo de espera a 60 segundos
     });
 
     // Seleccionar el modelo DeepSeek (en este caso deepseek-reasoner)
