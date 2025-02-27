@@ -52,19 +52,24 @@ export default function Chat() {
         body: JSON.stringify({ message: userInput }),
       });
 
-      const data = await response.json();
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantContent = "";
 
-      if (data.error) throw new Error(data.error);
-      if (!data.content) throw new Error("Respuesta vacía del servidor");
-
-      const assistantMessage: Message = {
-        id: Date.now().toString(),
-        content: data.content,
-        role: "assistant",
-        created_at: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
+      while (true) {
+        const { done, value } = await reader?.read()!;
+        if (done) break;
+        assistantContent += decoder.decode(value);
+        setMessages((prev) => [
+          ...prev.filter((msg) => msg.role !== "assistant"),
+          {
+            id: Date.now().toString(),
+            content: assistantContent,
+            role: "assistant",
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      }
     } catch (error) {
       console.error("Error:", error);
     } finally {

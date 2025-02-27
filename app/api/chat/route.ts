@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       .from("chats")
       .select("content, role")
       .order("created_at", { ascending: true })
-      .limit(10);
+      .limit(2);
 
     const interleavedHistory: {
       role: "user" | "system" | "assistant";
@@ -119,25 +119,52 @@ export async function POST(request: Request) {
       messages: messagesArray,
       model: chosenModel,
       temperature: 0.5,
-      max_tokens: 3000,
+      max_tokens: 1500,
       presence_penalty: 0.6,
       frequency_penalty: 0.6,
+      stream: true,
     });
 
-    let assistantContent =
-      completion.choices?.[0]?.message?.content ||
-      "Error en la respuesta de IA.";
-    assistantContent = cleanAssistantResponse(assistantContent);
+    const encoder = new TextEncoder();
+    let fullResponse = "";
 
-    // Guardar la respuesta del asistente en Supabase
-    const { error: assistantMessageError } = await supabase
-      .from("chats")
-      .insert([
-        { user_id: user.id, content: assistantContent, role: "assistant" },
-      ]);
-    if (assistantMessageError) throw assistantMessageError;
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of completion) {
+            const content = chunk.choices[0]?.delta?.content || "";
+            fullResponse += content;
+            controller.enqueue(encoder.encode(content));
+          }
+        } catch (error) {
+          console.error("Error en el stream:", error);
+          controller.error(error);
+        } finally {
+          // Guardar respuesta limpia al finalizar
+          const cleanedResponse = cleanAssistantResponse(fullResponse);
+          try {
+            await supabase.from("chats").insert([
+              {
+                user_id: user.id,
+                content: cleanedResponse,
+                role: "assistant",
+              },
+            ]);
+            console.log("Guardado en Supabase");
+          } catch (err: any) {
+            console.error("Error guardando en Supabase", err);
+          }
+          controller.close();
+        }
+      },
+    });
 
-    return NextResponse.json({ content: assistantContent });
+    return new Response(readableStream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
   } catch (error: any) {
     console.error("DeepSeek API error:", error.message || error);
     return NextResponse.json(
